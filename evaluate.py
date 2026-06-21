@@ -182,9 +182,22 @@ def resize_to_match(img1, img2):
     return cv2.resize(img1, (w, h), interpolation=cv2.INTER_CUBIC)
 
 
+def _is_image(filename):
+    return filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp'))
+
+
 def main(train_folder, target_folder):
-    train_images = sorted(os.listdir(train_folder))
-    target_images = sorted(os.listdir(target_folder))
+    target_images = sorted([f for f in os.listdir(target_folder) if _is_image(f)])
+    train_images = sorted([f for f in os.listdir(train_folder) if _is_image(f)])
+
+    train_set = set(train_images)
+    common_images = [f for f in target_images if f in train_set]
+
+    if not common_images:
+        print("No matching image filenames found between the two folders!")
+        print(f"  train_folder files: {train_images[:5]}...")
+        print(f"  target_folder files: {target_images[:5]}...")
+        return
 
     sam, ergas, uiqi, qnr, brisque, niqe, hist, spectral, psnr, ssim_list, ciede, lpips_list = [], [], [], [], [], [], [], [], [], [], [], []
 
@@ -192,9 +205,13 @@ def main(train_folder, target_folder):
 
     imgs1, imgs2 = [], []
 
-    for train_img, target_img in zip(train_images, target_images):
-        train_image = cv2.imread(os.path.join(train_folder, train_img))
-        target_image = cv2.imread(os.path.join(target_folder, target_img))
+    for img_name in common_images:
+        train_image = cv2.imread(os.path.join(train_folder, img_name))
+        target_image = cv2.imread(os.path.join(target_folder, img_name))
+
+        if train_image is None or target_image is None:
+            print(f"Skipping {img_name}: could not read image")
+            continue
 
         if train_image.shape != target_image.shape:
             train_image = resize_to_match(train_image, target_image)
