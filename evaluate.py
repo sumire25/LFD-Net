@@ -186,14 +186,22 @@ def _is_image(filename):
     return filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp'))
 
 
+def _extract_id(filename):
+    import re
+    match = re.match(r'(\d+)', filename)
+    return match.group(1) if match else filename
+
+
 def main(train_folder, target_folder):
     target_images = sorted([f for f in os.listdir(target_folder) if _is_image(f)])
     train_images = sorted([f for f in os.listdir(train_folder) if _is_image(f)])
 
-    train_set = set(train_images)
-    common_images = [f for f in target_images if f in train_set]
+    target_map = {_extract_id(f): f for f in target_images}
+    train_map = {_extract_id(f): f for f in train_images}
 
-    if not common_images:
+    common_ids = sorted(set(train_map.keys()) & set(target_map.keys()), key=lambda x: int(x) if x.isdigit() else x)
+
+    if not common_ids:
         print("No matching image filenames found between the two folders!")
         print(f"  train_folder files: {train_images[:5]}...")
         print(f"  target_folder files: {target_images[:5]}...")
@@ -205,12 +213,12 @@ def main(train_folder, target_folder):
 
     imgs1, imgs2 = [], []
 
-    for img_name in common_images:
-        train_image = cv2.imread(os.path.join(train_folder, img_name))
-        target_image = cv2.imread(os.path.join(target_folder, img_name))
+    for img_id in common_ids:
+        train_image = cv2.imread(os.path.join(train_folder, train_map[img_id]))
+        target_image = cv2.imread(os.path.join(target_folder, target_map[img_id]))
 
         if train_image is None or target_image is None:
-            print(f"Skipping {img_name}: could not read image")
+            print(f"Skipping {img_id}: could not read image")
             continue
 
         if train_image.shape != target_image.shape:

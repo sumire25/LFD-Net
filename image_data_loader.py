@@ -1,8 +1,18 @@
 import os
+import re
 import torch
 import torch.utils.data as data
 import numpy as np
 from PIL import Image
+
+
+def _extract_id(filename):
+    match = re.match(r'(\d+)', filename)
+    return match.group(1) if match else filename
+
+
+def _build_id_map(directory):
+    return {_extract_id(f): f for f in os.listdir(directory) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.bmp'))}
 
 
 class Haze1kDataset(data.Dataset):
@@ -10,12 +20,18 @@ class Haze1kDataset(data.Dataset):
         self.input_dir = input_dir
         self.target_dir = target_dir
         self.resize = resize
-        self.filenames = sorted([f for f in os.listdir(input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.bmp'))])
+
+        input_map = _build_id_map(input_dir)
+        target_map = _build_id_map(target_dir)
+
+        self.common_ids = sorted(set(input_map.keys()) & set(target_map.keys()), key=lambda x: int(x) if x.isdigit() else x)
+        self.input_map = input_map
+        self.target_map = target_map
 
     def __getitem__(self, index):
-        filename = self.filenames[index]
-        hazy_path = os.path.join(self.input_dir, filename)
-        clear_path = os.path.join(self.target_dir, filename)
+        img_id = self.common_ids[index]
+        hazy_path = os.path.join(self.input_dir, self.input_map[img_id])
+        clear_path = os.path.join(self.target_dir, self.target_map[img_id])
 
         hazy_image = Image.open(hazy_path).convert('RGB')
         clear_image = Image.open(clear_path).convert('RGB')
@@ -33,4 +49,4 @@ class Haze1kDataset(data.Dataset):
         return clear_tensor, hazy_tensor
 
     def __len__(self):
-        return len(self.filenames)
+        return len(self.common_ids)
